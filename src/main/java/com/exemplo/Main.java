@@ -6,6 +6,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
@@ -14,56 +15,115 @@ public class Main extends JFrame {
     private static SessionFactory factory;
     private JTable table;
     private DefaultTableModel tableModel;
+    
+    // Form Fields
+    private JTextField txtId, txtNome, txtPreco, txtEstoque, txtVoltagem;
 
     public Main() {
-        // 1. Setup Window (dwl/Wayland friendly)
-        setTitle("Sistema MoR - Protótipo");
-        setSize(600, 400);
+        setTitle("Gerenciador de Produtos - MoR Prototype");
+        setSize(800, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setLayout(new BorderLayout());
+        setLocationRelativeTo(null); // Center on screen
 
-        // 2. Table to show Data
-        tableModel = new DefaultTableModel(new String[]{"ID", "Nome", "Preço", "Estoque"}, 0);
+        // Root Panel with padding
+        JPanel root = new JPanel(new BorderLayout(10, 10));
+        root.setBorder(new EmptyBorder(10, 10, 10, 10));
+        setContentPane(root);
+
+        // --- TABLE SECTION ---
+        tableModel = new DefaultTableModel(new String[]{"ID", "Nome", "Preço", "Estoque", "Tipo"}, 0);
         table = new JTable(tableModel);
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        root.add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // 3. Form Panel
-        JPanel panel = new JPanel(new GridLayout(5, 2));
-        JTextField txtNome = new JTextField();
-        JTextField txtPreco = new JTextField();
-        JTextField txtEstoque = new JTextField();
-        JTextField txtVoltagem = new JTextField();
-        JButton btnSave = new JButton("Salvar Eletrônico");
+        // --- FORM SECTION ---
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(5, 5, 5, 5);
 
-        panel.add(new JLabel("Nome:")); panel.add(txtNome);
-        panel.add(new JLabel("Preço:")); panel.add(txtPreco);
-        panel.add(new JLabel("Estoque:")); panel.add(txtEstoque);
-        panel.add(new JLabel("Voltagem:")); panel.add(txtVoltagem);
-        panel.add(btnSave);
+        txtId = new JTextField(); txtId.setEditable(false); // ID is auto-gen
+        txtNome = new JTextField(15);
+        txtPreco = new JTextField();
+        txtEstoque = new JTextField();
+        txtVoltagem = new JTextField();
 
-        add(panel, BorderLayout.SOUTH);
+        addFormField(formPanel, "ID (Auto):", txtId, gbc, 0);
+        addFormField(formPanel, "Nome:", txtNome, gbc, 1);
+        addFormField(formPanel, "Preço:", txtPreco, gbc, 2);
+        addFormField(formPanel, "Estoque:", txtEstoque, gbc, 3);
+        addFormField(formPanel, "Voltagem:", txtVoltagem, gbc, 4);
 
-        // 4. Save Action
-        btnSave.addActionListener(e -> {
-            saveProduct(txtNome.getText(), txtPreco.getText(), txtEstoque.getText(), txtVoltagem.getText());
-            refreshTable();
+        // --- BUTTONS ---
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnSave = new JButton("Novo/Salvar");
+        JButton btnUpdate = new JButton("Atualizar");
+        JButton btnDelete = new JButton("Excluir");
+        btnDelete.setForeground(Color.RED);
+
+        btnPanel.add(btnSave);
+        btnPanel.add(btnUpdate);
+        btnPanel.add(btnDelete);
+
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.add(formPanel, BorderLayout.NORTH);
+        rightPanel.add(btnPanel, BorderLayout.SOUTH);
+        root.add(rightPanel, BorderLayout.EAST);
+
+        // --- EVENTS ---
+        
+        // Fill form when selecting a row
+        table.getSelectionModel().addListSelectionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row != -1) {
+                txtId.setText(tableModel.getValueAt(row, 0).toString());
+                txtNome.setText(tableModel.getValueAt(row, 1).toString());
+                txtPreco.setText(tableModel.getValueAt(row, 2).toString());
+                txtEstoque.setText(tableModel.getValueAt(row, 3).toString());
+            }
         });
+
+        btnSave.addActionListener(e -> { saveOrUpdate(false); refreshTable(); });
+        btnUpdate.addActionListener(e -> { saveOrUpdate(true); refreshTable(); });
+        btnDelete.addActionListener(e -> { deleteProduct(); refreshTable(); });
 
         refreshTable();
     }
 
-    private void saveProduct(String nome, String preco, String estoque, String voltagem) {
+    private void addFormField(JPanel p, String label, JTextField field, GridBagConstraints gbc, int row) {
+        gbc.gridx = 0; gbc.gridy = row; p.add(new JLabel(label), gbc);
+        gbc.gridx = 1; p.add(field, gbc);
+    }
+
+    private void saveOrUpdate(boolean isUpdate) {
         try (Session session = factory.openSession()) {
             session.beginTransaction();
             ProdutoEletronico p = new ProdutoEletronico();
-            p.setNome(nome);
-            p.setPreco(Double.parseDouble(preco));
-            p.setEstoque(Integer.parseInt(estoque));
-            p.setVoltagem(voltagem);
-            session.persist(p);
+            
+            if (isUpdate) p.setId(Long.parseLong(txtId.getText()));
+            
+            p.setNome(txtNome.getText());
+            p.setPreco(Double.parseDouble(txtPreco.getText()));
+            p.setEstoque(Integer.parseInt(txtEstoque.getText()));
+            p.setVoltagem(txtVoltagem.getText());
+            
+            session.merge(p); // Merge works for both insert and update
             session.getTransaction().commit();
+            clearForm();
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Erro ao salvar: " + ex.getMessage());
+            JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage());
+        }
+    }
+
+    private void deleteProduct() {
+        String idStr = txtId.getText();
+        if (idStr.isEmpty()) return;
+        
+        try (Session session = factory.openSession()) {
+            session.beginTransaction();
+            Produto p = session.get(Produto.class, Long.parseLong(idStr));
+            if (p != null) session.remove(p);
+            session.getTransaction().commit();
+            clearForm();
         }
     }
 
@@ -72,14 +132,18 @@ public class Main extends JFrame {
         try (Session session = factory.openSession()) {
             List<Produto> list = session.createQuery("from Produto", Produto.class).list();
             for (Produto p : list) {
-                tableModel.addRow(new Object[]{p.getId(), p.getNome(), p.getPreco(), p.getEstoque()});
+                tableModel.addRow(new Object[]{p.getId(), p.getNome(), p.getPreco(), p.getEstoque(), p.getClass().getSimpleName()});
             }
         }
     }
 
+    private void clearForm() {
+        txtId.setText(""); txtNome.setText(""); txtPreco.setText(""); 
+        txtEstoque.setText(""); txtVoltagem.setText("");
+    }
+
     public static void main(String[] args) {
         factory = new Configuration().configure().buildSessionFactory();
-        // Run the GUI on the Event Dispatch Thread
         SwingUtilities.invokeLater(() -> new Main().setVisible(true));
     }
 }
