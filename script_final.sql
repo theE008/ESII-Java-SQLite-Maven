@@ -1,0 +1,16 @@
+PRAGMA foreign_keys=OFF;
+BEGIN TRANSACTION;
+CREATE TABLE HT_Produto(id bigint not null, hib_sess_id char(36) not null, primary key (id, hib_sess_id));
+CREATE TABLE HTE_Produto(dataValidade date, estoque integer, HTE_IDENTITY bigint integer, id bigint, preco float, hib_sess_id char(36) not null, nome varchar(255), voltagem varchar(255), primary key (HTE_IDENTITY, hib_sess_id));
+CREATE TABLE HTE_ProdutoPerecivel(dataValidade date, estoque integer, HTE_IDENTITY bigint integer, id bigint, preco float, hib_sess_id char(36) not null, nome varchar(255), primary key (HTE_IDENTITY, hib_sess_id));
+CREATE TABLE HTE_ProdutoEletronico(estoque integer, HTE_IDENTITY bigint integer, id bigint, preco float, hib_sess_id char(36) not null, nome varchar(255), voltagem varchar(255), primary key (HTE_IDENTITY, hib_sess_id));
+CREATE TABLE Item (codigoItem integer, quantidade integer, valorItem float, produto_id bigint, pedido_id bigint, primary key (codigoItem));
+CREATE TABLE Pedido (id integer, data timestamp, valorTotal float, primary key (id));
+CREATE TABLE Produto (id integer, estoque integer, nome varchar(255), preco float, primary key (id));
+INSERT INTO Produto VALUES(1,4,'Computador',2659.9);
+INSERT INTO Produto VALUES(2,20,'Microondas',453.99);
+CREATE TABLE ProdutoEletronico (voltagem varchar(255), id bigint not null, primary key (id));
+INSERT INTO ProdutoEletronico VALUES('540',1);
+INSERT INTO ProdutoEletronico VALUES('220',2);
+CREATE TABLE ProdutoPerecivel (dataValidade date, id bigint not null, primary key (id));
+COMMIT;
